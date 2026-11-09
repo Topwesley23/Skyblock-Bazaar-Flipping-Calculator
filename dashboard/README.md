@@ -9,6 +9,22 @@ python3 dashboard/server.py        # then open http://127.0.0.1:8050
 
 Python 3.8+, nothing to install. It only listens on your own computer.
 
+## On your phone
+
+```bash
+python3 dashboard/server.py --lan
+```
+
+It prints a link like `http://192.168.1.23:8050/?key=...`. Open that on your
+phone while it is on the same Wi-Fi as the computer. The key is remembered, so
+after the first visit you can bookmark the page or use "Add to Home Screen" to
+get an app icon. Keep the link private: anyone with it, on your Wi-Fi, can use
+the dashboard. Delete `trader/dashboard/key.txt` and restart for a new key.
+
+If the phone can't connect, allow Python through the computer's firewall
+(Windows asks the first time; on a Mac, accept "incoming connections").
+The computer has to stay on and awake while you use it.
+
 ## What it does
 
 - **Scan now** runs the whole chain on your watchlist: scanner, entry timer,

@@ -14,9 +14,13 @@ Standard library only. Binds to 127.0.0.1 so only this computer can open it.
 """
 
 import datetime
+import hmac
 import json
 import os
+import secrets
+import socket
 import subprocess
+import urllib.parse
 import sys
 import threading
 import time
@@ -581,9 +585,58 @@ def find_idea(sym):
     return None
 
 
+KEY = None   # set with --lan: phones on your Wi-Fi need it, this computer does not
+
+
+def lan_key():
+    path = os.path.join(DASH, "key.txt")
+    try:
+        with open(path) as f:
+            k = f.read().strip()
+        if len(k) >= 12:
+            return k
+    except OSError:
+        pass
+    k = secrets.token_urlsafe(12)
+    os.makedirs(DASH, exist_ok=True)
+    with open(path, "w") as f:
+        f.write(k)
+    return k
+
+
+def lan_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))   # picks the Wi-Fi address; sends nothing
+        return s.getsockname()[0]
+    except OSError:
+        return "YOUR-COMPUTER-IP"
+    finally:
+        s.close()
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def allowed(self):
+        """With --lan, anything not from this computer needs the key (in the link once, then a cookie)."""
+        if KEY is None or self.client_address[0] in ("127.0.0.1", "::1"):
+            return True
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            name, _, val = part.strip().partition("=")
+            if name == "dtkey" and hmac.compare_digest(val, KEY):
+                return True
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if hmac.compare_digest((q.get("key") or [""])[0], KEY):
+            self.send_response(303)
+            self.send_header("Set-Cookie", "dtkey=%s; Max-Age=31536000; Path=/; HttpOnly; SameSite=Strict" % KEY)
+            self.send_header("Location", "/")
+            self.end_headers()
+            return None
+        self.send(403, b"<h3>Day Trader: open the link with the key that the server printed.</h3>",
+                  "text/html; charset=utf-8")
+        return False
 
     def send(self, code, body, ctype="application/json"):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
@@ -595,6 +648,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        if not self.allowed():
+            return
+        if urllib.parse.urlsplit(self.path).path == "/manifest.json":
+            return self.send(200, {"name": "Day Trader", "short_name": "Trader", "start_url": "/",
+                                   "display": "standalone", "background_color": "#0f1216",
+                                   "theme_color": "#0f1216"}, "application/manifest+json")
         if self.path in ("/", "/index.html"):
             with open(os.path.join(HERE, "app.html"), "rb") as f:
                 return self.send(200, f.read(), "text/html; charset=utf-8")
@@ -603,6 +662,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
+        if not self.allowed():
+            return
         # Only this page may change things: block requests from other websites.
         origin = self.headers.get("Origin")
         host = self.headers.get("Host", "")
@@ -674,14 +735,22 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    port = int(os.environ.get("PORT") or (sys.argv[1] if len(sys.argv) > 1 else 8050))
+    global KEY
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    lan = "--lan" in sys.argv[1:]
+    port = int(os.environ.get("PORT") or (args[0] if args else 8050))
     for d in (DASH, PAPER, WORK):
         os.makedirs(d, exist_ok=True)
     ensure_config()
     paper_portfolio()
     threading.Thread(target=autopilot, daemon=True).start()
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    if lan:
+        KEY = lan_key()
+    srv = ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", port), Handler)
     print("Day Trader dashboard: http://127.0.0.1:%d   (Ctrl+C to stop)" % port)
+    if lan:
+        print("\nOn your phone (same Wi-Fi), open:\n\n    http://%s:%d/?key=%s\n" % (lan_ip(), port, KEY))
+        print("Keep that link private: it controls this dashboard. Delete trader/dashboard/key.txt for a new one.")
     print("Paper trading is simulated. Nothing here can place a real order.")
     try:
         srv.serve_forever()
