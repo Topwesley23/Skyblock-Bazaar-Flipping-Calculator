@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day Trader</title>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --ink: #14171c; --muted: #5d6673; --line: #e3e6ea;
+  --accent: #2f5bea; --accent-ink: #ffffff; --green: #13804a; --green-bg: #e3f4ea;
+  --red: #c4372f; --red-bg: #fbe7e5; --amber: #9a6200; --amber-bg: #fdf1d8; --gray-bg: #eef0f3;
+  --bar-n: #c9ced6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --card: #171b21; --ink: #e8ebef; --muted: #98a2b0; --line: #2a3039;
+    --accent: #6d8dff; --accent-ink: #0f1216; --green: #4cc38a; --green-bg: #15301f;
+    --red: #ff7a70; --red-bg: #3a1a18; --amber: #f0b34a; --amber-bg: #33280f; --gray-bg: #222831;
+    --bar-n: #3b4350;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --card: #171b21; --ink: #e8ebef; --muted: #98a2b0; --line: #2a3039;
+  --accent: #6d8dff; --accent-ink: #0f1216; --green: #4cc38a; --green-bg: #15301f;
+  --red: #ff7a70; --red-bg: #3a1a18; --amber: #f0b34a; --amber-bg: #33280f; --gray-bg: #222831;
+  --bar-n: #3b4350;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 16px; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+h2 { font-size: 15px; margin: 0 0 10px; }
+.sub { color: var(--muted); font-size: 12.5px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; background: var(--gray-bg); color: var(--muted); }
+.pill.open { background: var(--green-bg); color: var(--green); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); padding: 8px 12px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  border-radius: 8px; padding: 7px 12px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.small { padding: 4px 9px; font-size: 12.5px; }
+button:disabled { opacity: .5; cursor: default; }
+.busy { color: var(--accent); font-weight: 600; font-size: 13px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.kpi .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi .l { color: var(--muted); font-size: 12px; }
+.meter { height: 5px; background: var(--gray-bg); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.meter i.full { background: var(--red); }
+.pos { color: var(--green); } .neg { color: var(--red); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.tablewrap { overflow-x: auto; }
+.empty { color: var(--muted); padding: 8px 0; }
+.ideas { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.idea { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.idea .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sym { font-size: 17px; font-weight: 700; }
+.badge { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em;
+  background: var(--gray-bg); color: var(--muted); }
+.badge.ready, .badge.taken { background: var(--green-bg); color: var(--green); }
+.badge.blocked, .badge.refused, .badge.error { background: var(--red-bg); color: var(--red); }
+.badge.late, .badge.odds { background: var(--amber-bg); color: var(--amber); }
+.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.nums div { background: var(--gray-bg); border-radius: 7px; padding: 5px 7px; }
+.nums b { display: block; font-variant-numeric: tabular-nums; }
+.nums span { color: var(--muted); font-size: 11.5px; }
+.odds { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: var(--gray-bg); }
+.odds i { display: block; height: 100%; }
+.odds .t { background: var(--green); } .odds .s { background: var(--red); } .odds .n { background: var(--bar-n); }
+.legend { display: flex; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.reason { font-size: 12.5px; color: var(--muted); }
+.news a { color: var(--ink); text-decoration: none; } .news a:hover { text-decoration: underline; }
+.news li { font-size: 12.5px; margin-bottom: 3px; }
+.news ul { margin: 0; padding-left: 16px; }
+.tag { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: var(--gray-bg); color: var(--muted); margin-left: 4px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+pre { background: var(--gray-bg); padding: 8px; border-radius: 7px; font-size: 12px; white-space: pre-wrap; word-break: break-all; margin: 0; }
+.log { max-height: 280px; overflow-y: auto; font-size: 12.5px; }
+.log div { padding: 4px 0; border-bottom: 1px solid var(--line); }
+.log .t { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+.log .win { color: var(--green); } .log .loss, .log .error { color: var(--red); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cols > *, .ideas > *, .kpis > * { min-width: 0; }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } .ideas { grid-template-columns: 1fr; } }
+details summary { cursor: pointer; font-weight: 600; }
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 14px; margin-top: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; }
+textarea { min-height: 60px; }
+label.check { flex-direction: row; align-items: center; gap: 8px; }
+.notice { background: var(--amber-bg); color: var(--amber); border-radius: 9px; padding: 9px 12px; font-size: 13px; margin-bottom: 14px; }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 9px 14px; border-radius: 9px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Day Trader</h1>
+      <div class="sub" id="clock">Loading…</div>
+    </div>
+    <div class="controls">
+      <span class="busy" id="busy"></span>
+      <div class="seg" id="mode">
+        <button data-mode="off">Off</button>
+        <button data-mode="ideas">Find ideas</button>
+        <button data-mode="auto">Auto paper-trade</button>
+      </div>
+      <button class="primary" id="scan">Scan now</button>
+    </div>
+  </header>
+
+  <div class="notice">Paper money only: every trade here is simulated at a delayed price. Nothing on this page can place a real order.
+    Most day traders lose money, and good-looking odds don't change that.</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Open positions</h2>
+      <button class="small" id="refresh">Refresh prices</button></div>
+    <div class="tablewrap" id="positions"></div>
+  </div>
+
+  <div class="card">
+    <h2>Trade ideas</h2>
+    <div class="sub" id="scansum" style="margin-bottom:10px"></div>
+    <div class="ideas" id="ideas"></div>
+  </div>
+
+  <div class="cols">
+    <div class="card"><h2>Trade history</h2><div class="tablewrap" id="trades"></div></div>
+    <div class="card"><h2>Activity</h2><div class="log" id="activity"></div></div>
+  </div>
+
+  <div class="card">
+    <details id="settingsBox">
+      <summary>Settings</summary>
+      <h2 style="margin-top:14px">Your rules</h2>
+      <div class="form" id="rules"></div>
+      <h2 style="margin-top:18px">What to scan and how to plan</h2>
+      <div class="form" id="scanset"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" id="save">Save settings</button>
+        <button id="reset">Reset paper account…</button>
+      </div>
+    </details>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let S = null;          // latest /api/state
+let editing = false;   // don't redraw the settings form while you type
+
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function safeUrl(u) { return /^https?:\/\//i.test(u || "") ? u : "#"; }
+const money = (n) => n == null ? "–" : (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = (n) => (n > 0 ? "+" : "") + money(n);
+const pct = (x) => x == null ? "–" : (x * 100).toFixed(1) + "%";
+const cls = (n) => n > 0 ? "pos" : n < 0 ? "neg" : "";
+function when(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+}
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 3500);
+}
+async function post(path, body = {}) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(j.error || "Something went wrong"); throw new Error(j.error); }
+  return j;
+}
+
+function drawHeader() {
+  const c = S.status.clock || {};
+  const open = c.open;
+  $("clock").innerHTML = `<span class="pill ${open ? "open" : ""}"><span class="dot"></span>${open ? "Market open" : "Market closed"}</span>
+    <span style="margin-left:8px">${esc(c.now_new_york || "")} New York${open ? "" : c.next_open ? " · next open " + esc(c.next_open) : ""}
+    ${c.reason && !open ? " · " + esc(c.reason) : ""}</span>`;
+  $("busy").textContent = S.status.busy ? S.status.busy + "…" : (S.status.error ? "Error: " + S.status.error : "");
+  $("scan").disabled = !!S.status.busy;
+  document.querySelectorAll("#mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === S.settings.mode));
+}
+
+function drawKpis() {
+  const a = S.account, c = S.config;
+  const daily = +c.max_daily_loss_usd || 0, tpd = +c.max_trades_per_day || 0;
+  const riskPct = daily ? Math.min(100, a.risk_used_today / daily * 100) : 0;
+  const tradePct = tpd ? Math.min(100, a.trades_today / tpd * 100) : 0;
+  const k = [
+    ["Account value", money(a.equity), `started at ${money(a.start)}`],
+    ["Cash", money(a.cash), `${money(a.positions_value)} in stocks`],
+    ["Today", `<span class="${cls(a.pnl_today)}">${signed(a.pnl_today)}</span>`, "closed trades"],
+    ["All time", `<span class="${cls(a.pnl_total)}">${signed(a.pnl_total)}</span>`, `${a.wins} wins · ${a.losses} losses`],
+    ["Risk used today", `${money(a.risk_used_today)}`, `of ${money(daily)} daily limit<div class="meter"><i class="${riskPct >= 100 ? "full" : ""}" style="width:${riskPct}%"></i></div>`],
+    ["Trades today", `${a.trades_today} / ${tpd}`, `max loss ${money(+c.max_loss_per_trade_usd)} each<div class="meter"><i class="${tradePct >= 100 ? "full" : ""}" style="width:${tradePct}%"></i></div>`],
+  ];
+  $("kpis").innerHTML = k.map(([l, v, s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="l">${s}</div></div>`).join("");
+}
+
+function drawPositions() {
+  const p = S.positions;
+  if (!p.length) { $("positions").innerHTML = `<div class="empty">No open positions.</div>`; return; }
+  $("positions").innerHTML = `<table><tr><th>Stock</th><th>Shares</th><th>Bought</th><th>Now</th><th>Stop</th><th>Target</th><th>P&L</th><th>Out by</th><th></th></tr>
+    ${p.map((x) => { const pl = (x.last - x.entry) * x.qty; return `<tr><td><b>${esc(x.symbol)}</b></td><td>${x.qty}</td><td>${money(x.entry)}</td>
+      <td>${money(x.last)}</td><td>${money(x.stop)}</td><td>${money(x.target)}</td><td class="${cls(pl)}">${signed(pl)}</td>
+      <td>${esc(x.flat_by)}</td><td><button class="small" data-sell="${esc(x.symbol)}">Close</button></td></tr>`; }).join("")}</table>`;
+}
+
+const LABEL = { ready: "ready", taken: "bought", late: "late", "odds against": "odds", blocked: "blocked", refused: "refused", waiting: "waiting", error: "error" };
+function drawIdeas() {
+  const d = S.ideas || {};
+  const ideas = d.ideas || [];
+  $("scansum").textContent = d.at ? `${d.scan} · last scan ${when(d.at)}` :
+    "No scan yet. Press Scan now (after 9:50 AM New York), or turn on the autopilot.";
+  if (!ideas.length) { $("ideas").innerHTML = d.at ? `<div class="empty">Nothing to check from the last scan.</div>` : ""; return; }
+  const held = new Set(S.positions.map((p) => p.symbol));
+  $("ideas").innerHTML = ideas.map((i) => {
+    const st = i.status || "";
+    const tm = i.tm || {};
+    const canBuy = i.risk && i.risk.verdict === "PASS" && i.qty && !held.has(i.symbol);
+    const odds = tm.target != null ? `<div class="odds"><i class="t" style="width:${tm.target * 100}%"></i><i class="s" style="width:${tm.stop * 100}%"></i><i class="n" style="width:${tm.neither * 100}%"></i></div>
+      <div class="legend"><span class="pos">target first ${pct(tm.target)}</span><span class="neg">stop first ${pct(tm.stop)}</span><span>neither ${pct(tm.neither)}</span></div>
+      <div class="reason">${esc(tm.verdict)}</div><div class="reason">History: ${esc(tm.history)}. ${tm.replays} replays, seed ${tm.seed}.</div>`
+      : (tm.verdict ? `<div class="reason">Time Machine: ${esc(tm.verdict)}</div>` : "");
+    const nums = i.stop != null ? `<div class="nums">
+        <div><span>Entry</span><b>${money(i.entry)}</b></div><div><span>Stop</span><b class="neg">${money(i.stop)}</b></div>
+        <div><span>Target</span><b class="pos">${money(i.target)}</b></div>
+        <div><span>Shares</span><b>${i.qty ?? "–"}</b></div><div><span>Max loss</span><b>${money(i.max_loss)}</b></div>
+        <div><span>Reward:risk</span><b>${i.reward_risk ?? "–"}</b></div></div>` : "";
+    const news = (i.news || []).length ? `<details class="news"><summary class="sub">News (${i.news.length})</summary><ul>${i.news.map((n) =>
+      `<li><a href="${esc(safeUrl(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>${(n.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</li>`).join("")}</ul></details>`
+      : `<div class="sub">No news in the last 24 hours.</div>`;
+    const ticket = i.order ? `<details><summary class="sub">Real order ticket</summary>
+      <div class="reason" style="margin:6px 0">To place this for real, paste it into Claude with <b>/trader-broker</b>. It checks it again and asks for your yes.</div>
+      <pre>${esc(JSON.stringify(i.order))}</pre><button class="small" data-copy="${esc(JSON.stringify(i.order))}" style="margin-top:6px">Copy</button></details>` : "";
+    const reasons = (i.reasons || []).map((r) => `<div class="reason">${esc(r)}</div>`).join("");
+    return `<div class="idea"><div class="top"><div><span class="sym">${esc(i.symbol)}</span>
+      <span class="sub"> ${money(i.last)} · triggered ${esc(i.trigger_time || "–")}</span></div>
+      <span class="badge ${esc((LABEL[st] || st).split(" ")[0])}">${esc(LABEL[st] || st)}</span></div>
+      ${reasons}${nums}${odds}${news}${ticket}
+      ${canBuy ? `<button class="${st === "ready" ? "primary" : ""}" data-buy="${esc(i.symbol)}">Paper trade ${i.qty} shares${st === "ready" ? "" : " anyway"}</button>` : ""}</div>`;
+  }).join("");
+}
+
+function drawTrades() {
+  const t = S.trades;
+  if (!t.length) { $("trades").innerHTML = `<div class="empty">No closed trades yet.</div>`; return; }
+  $("trades").innerHTML = `<table><tr><th>Date</th><th>Stock</th><th>Shares</th><th>In</th><th>Out</th><th>P&L</th><th>Why</th></tr>
+    ${t.map((x) => `<tr><td>${esc(x.date)}</td><td><b>${esc(x.symbol)}</b></td><td>${x.qty}</td><td>${money(x.entry)}</td><td>${money(x.exit)}</td>
+      <td class="${cls(x.pnl)}">${signed(x.pnl)}${x.r != null ? ` (${x.r > 0 ? "+" : ""}${x.r}R)` : ""}</td><td class="sub">${esc(x.reason)}</td></tr>`).join("")}</table>`;
+}
+
+function drawActivity() {
+  const a = S.activity;
+  $("activity").innerHTML = a.length ? a.map((x) => `<div class="${esc(x.kind)}"><span class="t">${when(x.at)}</span>${esc(x.msg)}</div>`).join("")
+    : `<div class="empty">Nothing yet.</div>`;
+}
+
+const RULES = [
+  ["budget", "Budget ($)", "number"], ["max_loss_per_trade_usd", "Max loss per trade ($)", "number"],
+  ["max_daily_loss_usd", "Daily loss limit ($)", "number"], ["max_trades_per_day", "Trades per day", "number"],
+  ["cash_buffer_pct", "Cash kept aside (%)", "number"], ["max_position_pct", "Biggest position (% of budget)", "number"],
+  ["min_reward_risk", "Minimum reward:risk", "number"], ["no_entries_before", "No buys before (NY time)", "text"],
+  ["no_entries_after", "No buys after (NY time)", "text"], ["flat_by", "Sell everything by (NY time)", "text"],
+  ["blocked", "Never trade (tickers, commas)", "text"], ["sec_user_agent", "SEC name and email", "text"],
+];
+const SCAN = [
+  ["universe", "Scan", "select", [["watchlist", "My watchlist (fast)"], ["market", "Whole US market (slow, ~5 min)"]]],
+  ["watchlist", "Watchlist (tickers, commas)", "textarea"], ["min_price", "Skip stocks under ($)", "number"],
+  ["scan_every_min", "Autopilot scans every (minutes)", "number"], ["max_candidates", "Ideas to check per scan", "number"],
+  ["stop", "Stop", "select", [["or-mid", "Opening-range middle"], ["or-low", "Opening-range low (wider)"], ["atr:1.5", "1.5 x ATR"]]],
+  ["target", "Target", "select", [["1R", "1R (1x the risk)"], ["1.5R", "1.5R"], ["2R", "2R (2x the risk)"], ["3R", "3R"]]],
+  ["replays", "Time Machine replays", "number"], ["fresh_minutes", "Too late after (minutes)", "number"],
+  ["skip_if_odds_against", "Autopilot skips trades the Time Machine leans against", "check"],
+];
+function field([k, label, type, opts], src) {
+  let v = src[k]; if (Array.isArray(v)) v = v.join(", ");
+  if (type === "select") return `<label>${label}<select data-k="${k}">${opts.map(([o, l]) => `<option value="${o}" ${o === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
+  if (type === "textarea") return `<label>${label}<textarea data-k="${k}">${esc(v)}</textarea></label>`;
+  if (type === "check") return `<label class="check"><input type="checkbox" data-k="${k}" ${v ? "checked" : ""}>${label}</label>`;
+  return `<label>${label}<input type="${type}" step="any" data-k="${k}" value="${esc(v)}"></label>`;
+}
+function drawSettings() {
+  if (editing) return;
+  $("rules").innerHTML = RULES.map((f) => field(f, S.config)).join("");
+  $("scanset").innerHTML = SCAN.map((f) => field(f, S.settings)).join("");
+}
+function collect(box) {
+  const o = {};
+  box.querySelectorAll("[data-k]").forEach((el) => { o[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value; });
+  return o;
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/state", { cache: "no-store" });
+    S = await r.json();
+    drawHeader(); drawKpis(); drawPositions(); drawIdeas(); drawTrades(); drawActivity(); drawSettings();
+  } catch (e) { $("busy").textContent = "Can't reach the dashboard server. Is it still running?"; }
+}
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  try {
+    if (b.dataset.mode) {
+      const m = b.dataset.mode;
+      if (m === "auto" && !confirm("Auto paper-trade: the dashboard will buy and sell in the SIMULATED paper account on its own, inside your rules. No real money. Turn it on?")) return;
+      await post("/api/settings", { mode: m }); toast(m === "off" ? "Autopilot off" : "Autopilot on: it scans every few minutes while the market is open");
+    } else if (b.id === "scan") { await post("/api/scan"); toast("Scanning…"); }
+    else if (b.id === "refresh") { await post("/api/check"); toast("Checking prices…"); }
+    else if (b.dataset.buy) {
+      if (!confirm(`Paper trade ${b.dataset.buy}? This is simulated: no real order.`)) return;
+      await post("/api/buy", { symbol: b.dataset.buy }); toast("Paper bought " + b.dataset.buy);
+    } else if (b.dataset.sell) {
+      if (!confirm(`Close your paper position in ${b.dataset.sell} at the current price?`)) return;
+      await post("/api/sell", { symbol: b.dataset.sell }); toast("Closed " + b.dataset.sell);
+    } else if (b.dataset.copy) { await navigator.clipboard.writeText(b.dataset.copy); toast("Copied"); }
+    else if (b.id === "save") {
+      await post("/api/config", collect($("rules"))); await post("/api/settings", collect($("scanset")));
+      editing = false; toast("Saved");
+    } else if (b.id === "reset") {
+      const t = prompt("This wipes the paper account, positions and history, and starts again at your budget. Type RESET to confirm.");
+      if (t !== "RESET") return; await post("/api/reset", { confirm: "RESET" }); toast("Paper account reset");
+    }
+  } catch (err) { /* toast already shown */ }
+  load();
+});
+$("settingsBox").addEventListener("input", () => { editing = true; });
+$("settingsBox").addEventListener("toggle", () => { if (!$("settingsBox").open) { editing = false; load(); } });
+
+load();
+setInterval(load, 4000);
+</script>
+</body>
+</html>
